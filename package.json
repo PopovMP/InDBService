@@ -1,0 +1,10 @@
+{
+  "name": "indexed-db-helper",
+  "version": "1.0.0",
+  "devDependencies": {
+    "typescript": "^4.4.2"
+  },
+  "scripts": {
+    "ts-build": "tsc --build"
+  }
+}
