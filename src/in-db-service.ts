@@ -39,9 +39,9 @@ class InDbService {
 		}
 
 		const request: IDBOpenDBRequest = window.indexedDB.open(dbScheme.name, dbScheme.version)
-		request.onupgradeneeded = this.openDB_upgradeNeeded.bind(this, dbScheme)
-		request.onsuccess       = this.openDB_success.bind(this, callback)
-		request.onerror         = this.openDB_error.bind(this, callback)
+		request.onupgradeneeded = this.openDBRequest_upgradeNeeded.bind(this, dbScheme)
+		request.onsuccess       = this.openDBRequest_success.bind(this, callback)
+		request.onerror         = this.openDBRequest_error.bind(this, callback)
 	}
 
 	public estimateUsage(callback: (estimate: StorageEstimate) => void): void {
@@ -133,20 +133,20 @@ class InDbService {
 	}
 
 	private dbRequest(options: InDBRequestOptions, callback: InDBCallback): void {
-		let isErrorReported = false
-
 		if (!this.db) {
 			callback('Indexed DB is not open!', null)
 			return
 		}
 
+		if (!this.db.objectStoreNames.contains(options.storeName)) {
+			callback('Cannot find store named: ' + options.storeName, null)
+			return
+		}
+
 		const transaction: IDBTransaction = this.db.transaction(options.storeName, options.mode)
 		transaction.onerror = function (event: Event): void {
-			if (!isErrorReported) {
-				isErrorReported = true
-				// @ts-ignore
-				callback(event.target.error.message, null)
-			}
+			// @ts-ignore
+			callback(event.target.error.message, null)
 		}
 
 		const objectStore: IDBObjectStore = transaction.objectStore(options.storeName)
@@ -180,11 +180,8 @@ class InDbService {
 		}
 
 		request.onerror = function (event: Event): void {
-			if (!isErrorReported) {
-				isErrorReported = true
-				// @ts-ignore
-				callback(event?.target?.error?.message, null)
-			}
+			// @ts-ignore
+			callback(event?.target?.error?.message, null)
 		}
 
 		request.onsuccess = function (event: Event): void {
@@ -193,30 +190,61 @@ class InDbService {
 		}
 	}
 
-	private openDB_upgradeNeeded(dbScheme: InDBScheme, event: Event | null): void {
+	private openDBRequest_upgradeNeeded(dbScheme: InDBScheme, event: Event | null): void {
 		// @ts-ignore
 		this.db = event?.target?.result as IDBDatabase
 
-		for (const schemeObjectStore of dbScheme.objectStores) {
-			const options: IDBObjectStoreParameters = {
-				keyPath      : schemeObjectStore.keyPath,
-				autoIncrement: schemeObjectStore.autoIncrement,
+		// Contains the store names required by the scheme
+		const schemeStoresNames: string[] = []
+		for (const newStore of dbScheme.objectStores) {
+			schemeStoresNames.push(newStore.name)
+
+			if (this.db.objectStoreNames.contains(newStore.name)) {
+				continue
 			}
 
-			const objectStore: IDBObjectStore = this.db.createObjectStore(schemeObjectStore.name, options)
-			for (const index of schemeObjectStore.indexes) {
+			const storeParameters: IDBObjectStoreParameters = {
+				keyPath      : newStore.keyPath,
+				autoIncrement: newStore.autoIncrement,
+			}
+
+			// Create a mew object store
+			const objectStore: IDBObjectStore = this.db.createObjectStore(newStore.name, storeParameters)
+
+			// Add the necessary indexes
+			for (const index of newStore.indexes) {
 				objectStore.createIndex(index.name, index.name, {unique: index.unique})
 			}
 		}
+
+		// Collect the existing store names that are not in the new scheme.
+		const storesToRemove: string[] = []
+		for (let i = 0; i < this.db.objectStoreNames.length; i++) {
+			const storeName: string = this.db.objectStoreNames[i]
+			if (schemeStoresNames.indexOf(storeName) === -1) {
+				storesToRemove.push(storeName)
+			}
+		}
+
+		// Removes the unnecessary object stores.
+		for (const name of storesToRemove) {
+			this.db.deleteObjectStore(name)
+		}
 	}
 
-	private openDB_success(callback: InDBCallback, event: Event | null): void {
+	private openDBRequest_success(callback: InDBCallback, event: Event | null): void {
 		// @ts-ignore
 		this.db = event?.target?.result as IDBDatabase
-		callback(null, {name: this.db.name, version: this.db.version})
+
+		const storeNames: string[] = []
+		for (let i = 0; i < this.db.objectStoreNames.length; i++) {
+			storeNames.push(this.db.objectStoreNames[i])
+		}
+
+		callback(null, {name: this.db.name, version: this.db.version, storeNames: storeNames})
 	}
 
-	private openDB_error(callback: InDBCallback, event: Event): void {
+	private openDBRequest_error(callback: InDBCallback, event: Event): void {
 		// @ts-ignore
 		callback(event.target.error.message, null)
 	}
