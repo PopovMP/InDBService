@@ -26,6 +26,17 @@ type InDBRequestOptions = {
 	actionTag: string,
 }
 
+type InDBKeysRange = {
+	index     : string,          // Document field to query
+	only?     : number | string, // Take documents with index = only
+	lower?    : number | string, // The lower bound of the range
+	upper?    : number | string, // The upper bound of the range
+	lowerOpen?: boolean,
+	upperOpen?: boolean,
+	count?    : number,  // Max documents count to select
+	fromTop?  : boolean, // Select from the top of the range
+}
+
 class InDbService {
 	private db: IDBDatabase | undefined
 
@@ -120,13 +131,13 @@ class InDbService {
 		this.dbRequest(options, callback)
 	}
 
-	public getAllKeys(storeName: string, callback: InDBCallback): void {
+	public getKeys(storeName: string, keysRange: InDBKeysRange, callback: InDBCallback): void {
 		const options: InDBRequestOptions = {
 			storeName: storeName,
-			data     : undefined,
+			data     : keysRange,
 			keyPath  : '',
 			mode     : 'readonly',
-			actionTag: 'getAllKeys',
+			actionTag: 'getKeys',
 		}
 
 		this.dbRequest(options, callback)
@@ -168,9 +179,9 @@ class InDbService {
 			case 'get':
 				request = objectStore.get(options.keyPath)
 				break
-			case 'getAllKeys':
-				request = objectStore.getAllKeys()
-				break
+			case 'getKeys':
+				this.dbCursor(objectStore, options.data, callback)
+				return
 			case 'put':
 				request = objectStore.put(options.data)
 				break
@@ -181,18 +192,57 @@ class InDbService {
 
 		request.onerror = function (event: Event): void {
 			// @ts-ignore
-			callback(event?.target?.error?.message, null)
+			callback(event.target.error.message, null)
 		}
 
 		request.onsuccess = function (event: Event): void {
 			// @ts-ignore
-			callback(null, event?.target?.result)
+			callback(null, event.target.result)
+		}
+	}
+
+	private dbCursor(objectStore: IDBObjectStore, range: InDBKeysRange, callback: InDBCallback): void {
+		const query: IDBKeyRange  = typeof range.only !== 'undefined'
+			? IDBKeyRange.only(range.only)
+			: typeof range.upper === 'undefined'
+				? IDBKeyRange.lowerBound(range.lower || 0, range.lowerOpen)
+				: IDBKeyRange.bound(range.lower || 0, range.upper, range.lowerOpen, range.upperOpen)
+
+		const index: IDBIndex     = objectStore.index(range.index)
+		const request: IDBRequest = index.openKeyCursor(query)
+		const keys: any[]         = []
+		const maxLength: number   = range.count || 1000000
+
+		request.onsuccess = function (event: Event): void {
+			// @ts-ignore
+			const cursor: IDBCursor = event.target.result
+
+			if (!cursor || (!range.fromTop && keys.length >= maxLength)) {
+				const data: any[] = range.fromTop
+					? keys.slice(Math.max(keys.length - maxLength, 0))
+					: keys
+				callback(null, data)
+				return
+			}
+
+			const cursorData: any = {}
+			cursorData[range.index] = cursor.key
+			cursorData[objectStore.keyPath as string] = cursor.primaryKey
+
+			keys.push(cursorData)
+
+			cursor.continue()
+		}
+
+		request.onerror = function (event: Event): void {
+			// @ts-ignore
+			callback(event.target.error.message, null)
 		}
 	}
 
 	private openDBRequest_upgradeNeeded(dbScheme: InDBScheme, event: Event | null): void {
 		// @ts-ignore
-		this.db = event?.target?.result as IDBDatabase
+		this.db = event.target.result as IDBDatabase
 
 		// Contains the store names required by the scheme
 		const schemeStoresNames: string[] = []
@@ -234,7 +284,7 @@ class InDbService {
 
 	private openDBRequest_success(callback: InDBCallback, event: Event | null): void {
 		// @ts-ignore
-		this.db = event?.target?.result as IDBDatabase
+		this.db = event.target.result as IDBDatabase
 
 		const storeNames: string[] = []
 		for (let i = 0; i < this.db.objectStoreNames.length; i++) {
