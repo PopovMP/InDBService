@@ -6,7 +6,7 @@
     "removeComments": true,
     "preserveConstEnums": true,
     "sourceMap": false,
-    "outFile": "./public/in-db-service.js"
+    "outFile": "./js/in-db-service.js"
   },
   "include": [
     "./src/**/*"

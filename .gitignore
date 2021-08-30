@@ -1,4 +1,3 @@
 .idea
 node_modules
-public/in-db-service.js
-public/in-db-service.tsbuildinfo
+js/in-db-service.tsbuildinfo
