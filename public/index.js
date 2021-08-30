@@ -101,6 +101,28 @@ function getRecentDataKeys_ready(err, data) {
 
 	appendText(output)
 
+	getData(data[data.length - 1].dataId)
+}
+
+function getData(dataId) {
+	appendText('\nGet data:')
+
+	inDbService.getData('storeName', dataId,
+		getDocument_ready)
+}
+
+function getDocument_ready(err, data) {
+	if (err) {
+		appendText(err)
+		return
+	}
+
+	appendText(`Updated at: ${new Date(data.updatedAt).toLocaleString()}, dataId: ${data.dataId}`)
+
+	getAllPrimaryKeys()
+}
+
+function getAllPrimaryKeys() {
 	appendText('\nAll primary keys:')
 	inDbService.getKeys('storeName', {index: 'dataId'},
 		getAllPrimaryKeys_ready)
@@ -115,6 +137,10 @@ function getAllPrimaryKeys_ready(err, data) {
 	const output = data.map(doc => `dataId: ${doc.dataId}`).join('\n')
 	appendText(output)
 
+	estimateUsage()
+}
+
+function estimateUsage() {
 	appendText('\nEstimated usage:')
 	inDbService.estimateUsage(estimateUsage_ready)
 }
