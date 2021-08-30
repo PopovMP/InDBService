@@ -61,6 +61,7 @@ function inDbHelper_addData_ready(err, data) {
 		countToLeave: 10,
 	}
 
+	appendText('\nRemove old data:')
 	inDbService.removeOldData(removeOptions,
 		removeOldData_ready)
 }
@@ -73,21 +74,22 @@ function removeOldData_ready(err, countRemoved) {
 
 	appendText(`Count removed: ${countRemoved}`)
 
-	getKeys()
+	getRecentDataKeys()
 }
 
-function getKeys() {
+function getRecentDataKeys() {
 	const query = {
 		index  : 'updatedAt',
 		count  : 10,
 		fromTop: true,
 	}
 
+	appendText('\nRecent data keys:')
 	inDbService.getKeys('storeName', query,
-		getKeys_ready)
+		getRecentDataKeys_ready)
 }
 
-function getKeys_ready(err, data) {
+function getRecentDataKeys_ready(err, data) {
 	if (err) {
 		appendText(err)
 		return
@@ -99,6 +101,21 @@ function getKeys_ready(err, data) {
 
 	appendText(output)
 
+	appendText('\nAll primary keys:')
+	inDbService.getKeys('storeName', {index: 'dataId'},
+		getAllPrimaryKeys_ready)
+}
+
+function getAllPrimaryKeys_ready(err, data) {
+	if (err) {
+		appendText(err)
+		return
+	}
+
+	const output = data.map(doc => `dataId: ${doc.dataId}`).join('\n')
+	appendText(output)
+
+	appendText('\nEstimated usage:')
 	inDbService.estimateUsage(estimateUsage_ready)
 }
 

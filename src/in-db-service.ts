@@ -262,11 +262,13 @@ class InDbService {
 	}
 
 	private dbCursor(objectStore: IDBObjectStore, range: InDBKeysRange, callback: InDBCallback): void {
-		const query: IDBKeyRange  = typeof range.only !== 'undefined'
+		const query: IDBKeyRange | undefined = typeof range.only !== 'undefined'
 			? IDBKeyRange.only(range.only)
-			: typeof range.upper === 'undefined'
-				? IDBKeyRange.lowerBound(range.lower || 0, range.lowerOpen)
-				: IDBKeyRange.bound(range.lower || 0, range.upper, range.lowerOpen, range.upperOpen)
+			: typeof range.lower === 'undefined'
+				? undefined
+				: typeof range.upper === 'undefined'
+					? IDBKeyRange.lowerBound(range.lower, range.lowerOpen)
+					: IDBKeyRange.bound(range.lower, range.upper, range.lowerOpen, range.upperOpen)
 
 		const index: IDBIndex     = objectStore.index(range.index)
 		const request: IDBRequest = index.openKeyCursor(query)
@@ -286,8 +288,10 @@ class InDbService {
 			}
 
 			const cursorData: any = {}
-			cursorData[range.index] = cursor.key
 			cursorData[objectStore.keyPath as string] = cursor.primaryKey
+			if (range.index !== objectStore.keyPath) {
+				cursorData[range.index] = cursor.key
+			}
 
 			keys.push(cursorData)
 

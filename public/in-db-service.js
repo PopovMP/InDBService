@@ -85,6 +85,42 @@ class InDbService {
         };
         this.dbRequest(options, callback);
     }
+    removeOldData(options, callback) {
+        const self = this;
+        this.countData(options.storeName, count_ready);
+        function count_ready(err, count) {
+            if (err) {
+                callback(err, 0);
+                return;
+            }
+            const keysRange = {
+                index: options.index,
+                count: count - options.countToLeave
+            };
+            self.getKeys(options.storeName, keysRange, getKeys_ready);
+        }
+        function getKeys_ready(err, data) {
+            if (err) {
+                callback(err, 0);
+                return;
+            }
+            loop(data.map((e) => e[options.keyPath]));
+        }
+        function loop(ids, countRemoved = 0) {
+            if (ids.length === 0) {
+                callback(null, countRemoved);
+                return;
+            }
+            self.deleteData(options.storeName, ids[0], deleteData_ready);
+            function deleteData_ready(err) {
+                if (err) {
+                    callback(err, countRemoved);
+                    return;
+                }
+                loop(ids.slice(1), countRemoved + 1);
+            }
+        }
+    }
     dbRequest(options, callback) {
         if (!this.db) {
             callback('Indexed DB is not open!', null);
@@ -126,24 +162,22 @@ class InDbService {
                 callback('Unknown operation', null);
                 return;
         }
-        request.onerror = function (event) {
-            callback(event.target.error.message, null);
-        };
-        request.onsuccess = function (event) {
-            callback(null, event.target.result);
-        };
+        request.onerror = (event) => callback(event.target.error.message, null);
+        request.onsuccess = (event) => callback(null, event.target.result);
     }
     dbCursor(objectStore, range, callback) {
         const query = typeof range.only !== 'undefined'
             ? IDBKeyRange.only(range.only)
-            : typeof range.upper === 'undefined'
-                ? IDBKeyRange.lowerBound(range.lower || 0, range.lowerOpen)
-                : IDBKeyRange.bound(range.lower || 0, range.upper, range.lowerOpen, range.upperOpen);
+            : typeof range.lower === 'undefined'
+                ? undefined
+                : typeof range.upper === 'undefined'
+                    ? IDBKeyRange.lowerBound(range.lower, range.lowerOpen)
+                    : IDBKeyRange.bound(range.lower, range.upper, range.lowerOpen, range.upperOpen);
         const index = objectStore.index(range.index);
         const request = index.openKeyCursor(query);
         const keys = [];
         const maxLength = range.count || 1000000;
-        request.onsuccess = function (event) {
+        request.onsuccess = (event) => {
             const cursor = event.target.result;
             if (!cursor || (!range.fromTop && keys.length >= maxLength)) {
                 const data = range.fromTop
@@ -153,14 +187,14 @@ class InDbService {
                 return;
             }
             const cursorData = {};
-            cursorData[range.index] = cursor.key;
             cursorData[objectStore.keyPath] = cursor.primaryKey;
+            if (range.index !== objectStore.keyPath) {
+                cursorData[range.index] = cursor.key;
+            }
             keys.push(cursorData);
             cursor.continue();
         };
-        request.onerror = function (event) {
-            callback(event.target.error.message, null);
-        };
+        request.onerror = (event) => callback(event.target.error.message, null);
     }
     openDBRequest_upgradeNeeded(dbScheme, event) {
         this.db = event.target.result;
