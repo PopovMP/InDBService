@@ -15,7 +15,7 @@ const dbScheme = {
 			unique: true,
 		}, {
 			name  : 'updatedAt',
-			unique: true,
+			unique: false,
 		}],
 	}],
 }
@@ -54,59 +54,15 @@ function inDbHelper_addData_ready(err, data) {
 
 	appendText(`Doc added: ${data}`)
 
-	removeOldData(10)
-}
-
-function removeOldData(countToLeave) {
-	let countRemoved = 0
-	inDbService.countData('storeName',
-		count_ready)
-
-	function count_ready(err, count) {
-		if (err) {
-			removeOldData_ready(err, countRemoved)
-			return
-		}
-
-		appendText(`Count: ${count}`)
-
-		// Get all IDs except the newest 10
-		inDbService.getKeys('storeName', {index: 'updatedAt', count: count - countToLeave},
-			getKeys_ready)
+	const removeOptions = {
+		storeName   : 'storeName',
+		keyPath     : 'dataId',
+		index       : 'updatedAt',
+		countToLeave: 10,
 	}
 
-	function getKeys_ready(err, data) {
-		if (err) {
-			removeOldData_ready(err, countRemoved)
-			return
-		}
-
-		loop(data.map(e => e.dataId))
-
-		function loop(ids) {
-			if (ids.length === 0) {
-				removeOldData_ready(null, countRemoved)
-				return
-			}
-
-			const id = ids[0]
-
-			inDbService.deleteData('storeName', id,
-				remove_ready)
-
-			function remove_ready(err) {
-				if (err) {
-					removeOldData_ready(err, countRemoved)
-					return
-				}
-
-				appendText(`Doc removed: ${id}`)
-				countRemoved += 1
-
-				loop(ids.slice(1))
-			}
-		}
-	}
+	inDbService.removeOldData(removeOptions,
+		removeOldData_ready)
 }
 
 function removeOldData_ready(err, countRemoved) {
@@ -122,24 +78,26 @@ function removeOldData_ready(err, countRemoved) {
 
 function getKeys() {
 	const query = {
-		index: 'updatedAt',
-		count: 10,
+		index  : 'updatedAt',
+		count  : 10,
 		fromTop: true,
 	}
 
 	inDbService.getKeys('storeName', query,
-		inDbHelper_getKeys_ready)
+		getKeys_ready)
 }
 
-function inDbHelper_getKeys_ready(err, data) {
+function getKeys_ready(err, data) {
 	if (err) {
 		appendText(err)
 		return
 	}
 
-	for (const doc of data) {
-		appendText(`time: ${new Date(doc.updatedAt).toLocaleString()}, dataId: ${doc.dataId}`)
-	}
+	const output = data
+		.map(doc => `Updated at: ${new Date(doc.updatedAt).toLocaleString()}, dataId: ${doc.dataId}`)
+		.join('\n')
+
+	appendText(output)
 
 	inDbService.estimateUsage(estimateUsage_ready)
 }

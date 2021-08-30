@@ -37,6 +37,13 @@ type InDBKeysRange = {
 	fromTop?  : boolean, // Select from the top of the range
 }
 
+type InDBRemoveOldDataOptions = {
+	storeName   : string,
+	keyPath     : string,
+	index       : string,
+	countToLeave: number,
+}
+
 class InDbService {
 	private db: IDBDatabase | undefined
 
@@ -143,6 +150,63 @@ class InDbService {
 		this.dbRequest(options, callback)
 	}
 
+	/**
+	 * Prunes DB by removing the oldest data.
+	 * It leaves the required newest count of data.
+	 */
+	public removeOldData(options: InDBRemoveOldDataOptions, callback: InDBCallback): void {
+		const self: InDbService = this
+
+		// Count all data
+		this.countData(options.storeName,
+			count_ready)
+
+		function count_ready(err: string | null, count: number) {
+			if (err) {
+				callback(err, 0)
+				return
+			}
+
+			const keysRange: InDBKeysRange = {
+				index: options.index,
+				count: count - options.countToLeave
+			}
+
+			// Get the IDs of the data to be removed
+			self.getKeys(options.storeName, keysRange,
+				getKeys_ready)
+		}
+
+		function getKeys_ready(err: string | null, data: any[]) {
+			if (err) {
+				callback(err, 0)
+				return
+			}
+
+			loop(data.map((e: any) => e[options.keyPath]))
+		}
+
+		function loop(ids: string[], countRemoved: number = 0) {
+			if (ids.length === 0) {
+				callback(null, countRemoved)
+				return
+			}
+
+			// Deletes an document from `storeName` with a specified ID
+			self.deleteData(options.storeName, ids[0],
+				deleteData_ready)
+
+			function deleteData_ready(err: string | null) {
+				if (err) {
+					callback(err, countRemoved)
+					return
+				}
+
+				loop(ids.slice(1), countRemoved + 1)
+			}
+		}
+	}
+
 	private dbRequest(options: InDBRequestOptions, callback: InDBCallback): void {
 		if (!this.db) {
 			callback('Indexed DB is not open!', null)
@@ -190,15 +254,11 @@ class InDbService {
 				return
 		}
 
-		request.onerror = function (event: Event): void {
-			// @ts-ignore
-			callback(event.target.error.message, null)
-		}
+		// @ts-ignore
+		request.onerror = (event: Event): void => callback(event.target.error.message, null)
 
-		request.onsuccess = function (event: Event): void {
-			// @ts-ignore
-			callback(null, event.target.result)
-		}
+		// @ts-ignore
+		request.onsuccess = (event: Event): void => callback(null, event.target.result)
 	}
 
 	private dbCursor(objectStore: IDBObjectStore, range: InDBKeysRange, callback: InDBCallback): void {
@@ -213,7 +273,7 @@ class InDbService {
 		const keys: any[]         = []
 		const maxLength: number   = range.count || 1000000
 
-		request.onsuccess = function (event: Event): void {
+		request.onsuccess = (event: Event): void => {
 			// @ts-ignore
 			const cursor: IDBCursor = event.target.result
 
@@ -234,10 +294,8 @@ class InDbService {
 			cursor.continue()
 		}
 
-		request.onerror = function (event: Event): void {
-			// @ts-ignore
-			callback(event.target.error.message, null)
-		}
+		// @ts-ignore
+		request.onerror = (event: Event): void => callback(event.target.error.message, null)
 	}
 
 	private openDBRequest_upgradeNeeded(dbScheme: InDBScheme, event: Event | null): void {
