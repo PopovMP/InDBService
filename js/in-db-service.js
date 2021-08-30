@@ -93,6 +93,10 @@ class InDbService {
                 callback(err, 0);
                 return;
             }
+            if (count <= options.countToLeave) {
+                callback(null, 0);
+                return;
+            }
             const keysRange = {
                 index: options.index,
                 count: count - options.countToLeave

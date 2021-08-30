@@ -167,6 +167,12 @@ class InDbService {
 				return
 			}
 
+			// Check if there are objects to remove
+			if (count <= options.countToLeave) {
+				callback(null, 0)
+				return
+			}
+
 			const keysRange: InDBKeysRange = {
 				index: options.index,
 				count: count - options.countToLeave
