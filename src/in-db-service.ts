@@ -346,11 +346,6 @@ class InDbService {
 					objectStore.createIndex(index.name, index.name, {unique: !!index.unique})
 				}
 			}
-
-			// Creates an index over the keyPath
-			if (!objectStore.indexNames.contains(newStore.keyPath)) {
-				objectStore.createIndex(newStore.keyPath, newStore.keyPath, {unique: true})
-			}
 		}
 	}
 

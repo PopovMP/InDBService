@@ -224,9 +224,6 @@ class InDbService {
                     objectStore.createIndex(index.name, index.name, { unique: !!index.unique });
                 }
             }
-            if (!objectStore.indexNames.contains(newStore.keyPath)) {
-                objectStore.createIndex(newStore.keyPath, newStore.keyPath, { unique: true });
-            }
         }
     }
     openDBRequest_success(callback, event) {
