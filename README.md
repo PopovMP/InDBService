@@ -22,7 +22,7 @@ Open a DB by providing a scheme. **InDBService**  will create a new DB if it doe
 const scheme = {
     name : 'bookstore', // DB name. Usually your domain or project name.
     objectStores: [{
-       name   : 'books', // Object store name (aka Table name)
+        name   : 'books', // Object store name (aka Table name)
         keyPath: 'isbn', // Primary key for identifying the objects
     }],
 }
@@ -48,7 +48,8 @@ const book = {
     author: 'Douglas Adams',
     year  : '2009',
 }
-inDbService.addData('books', book, (err, data) => {})
+
+inDbService.addData('books', book, (err, keyPath) => {})
 ```
 
 ### Add or update a document
@@ -56,7 +57,7 @@ inDbService.addData('books', book, (err, data) => {})
 `putData` - adds a new document or updates an existing one.
 
 ```js
-inDbService.putData('books', book, (err, data) => {})
+inDbService.putData('books', book, (err, keyPath) => {})
 ```
 
 ### Get a document by key
@@ -65,7 +66,14 @@ inDbService.putData('books', book, (err, data) => {})
 
 ```js
 // Get a document
-inDbService.getData('books', '0330508113', (err, data) => {})
+inDbService.getData('books', '0330508113', (err, document) => {
+	if (err) {
+		console.log(err)
+		return
+	}
+
+	console.log( JSON.stringify(document, null, 2) )
+})
 ```
 
 ### Removes a document by key
