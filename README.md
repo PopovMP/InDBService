@@ -65,6 +65,23 @@ inDbService.getData('books', '0330508113', (err, data) => {})
 inDbService.deleteData('books', '0330508113', (err, data) => {})
 ```
 
+
+### Count of documents
+
+`countData` gives the count of the dataStore entries.
+
+```js
+// Count all documents
+inDbService.countData('books', (err, count) => {
+    if (err) {
+        console.log(err)
+        return
+    }
+
+    console.log(`Count: ${count}`)
+})
+```
+
 ### Get all keys
 
 In order to get all keys from a datastore the corresponding key must be a datastore index.
@@ -74,13 +91,13 @@ You define the datastore indexes in the scheme as follows:
 ```js
 // Database scheme
 const scheme = {
-	name : 'bookstore',
-	objectStores: [{
-		name   : 'books',
-		keyPath: 'isbn',
+    name : 'bookstore',
+    objectStores: [{
+        name   : 'books',
+        keyPath: 'isbn',
         indexes: [
-	        {name: 'isbn'     }, // Needed for `getAllKeys` example
-	        {name: 'updatedAt'}, // Needed for `removeOldData` and `getRecentDataKeys` examples
+            {name: 'isbn'     }, // Needed for `getAllKeys` example
+            {name: 'updatedAt'}, // Needed for `removeOldData` and `getRecentDataKeys` examples
         ],
     }],
 }

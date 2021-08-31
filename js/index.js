@@ -58,7 +58,20 @@ function inDbService_addData_ready(err, data) {
 
 	appendText(`Doc added: ${data}`)
 
-	removeOldData()
+	countData()
+}
+
+function countData() {
+	inDbService.countData('storeName', (err, count) => {
+		if (err) {
+			appendText(err)
+			return
+		}
+
+		appendText(`\nCount of data: ${count}`)
+
+		removeOldData()
+	})
 }
 
 function removeOldData() {
