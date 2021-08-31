@@ -1,20 +1,20 @@
 type InDBCallback = (err: string | null, data?: any | null) => void
 
 type InDBIndex = {
-	name  : string,
-	unique: boolean,
+	name   : string,
+	unique?: boolean, // Defaults to false
 }
 
 type InDBObjectStore = {
-	name         : string,
-	keyPath      : string,
-	autoIncrement: boolean,
-	indexes      : InDBIndex[],
+	name          : string,
+	keyPath       : string,
+	autoIncrement?: boolean,     // Defaults to false
+	indexes?      : InDBIndex[], // Defaults to [{name: keyPath, unique: true}]
 }
 
 type InDBScheme = {
 	name        : string,
-	version     : number,
+	version?    : number, // Defaults to 1
 	objectStores: InDBObjectStore[],
 }
 
@@ -40,7 +40,7 @@ type InDBKeysRange = {
 type InDBRemoveOldDataOptions = {
 	storeName   : string,
 	keyPath     : string,
-	index       : string,
+	index       : string, // Index to determine the records age
 	countToLeave: number,
 }
 
@@ -50,14 +50,15 @@ class InDbService {
 	constructor() {
 	}
 
-	public openDB(dbScheme: InDBScheme, callback: InDBCallback): void {
+	// noinspection JSUnusedGlobalSymbols
+	public openDB(scheme: InDBScheme, callback: InDBCallback): void {
 		if (typeof window.indexedDB !== 'object') {
 			callback('Indexed DB is not supported!', null)
 			return
 		}
 
-		const request: IDBOpenDBRequest = window.indexedDB.open(dbScheme.name, dbScheme.version)
-		request.onupgradeneeded = this.openDBRequest_upgradeNeeded.bind(this, dbScheme)
+		const request: IDBOpenDBRequest = window.indexedDB.open(scheme.name, scheme.version || 1)
+		request.onupgradeneeded = this.openDBRequest_upgradeNeeded.bind(this, scheme)
 		request.onsuccess       = this.openDBRequest_success.bind(this, callback)
 		request.onerror         = this.openDBRequest_error.bind(this, callback)
 	}
@@ -78,6 +79,7 @@ class InDbService {
 		this.dbRequest(options, callback)
 	}
 
+	// noinspection JSUnusedGlobalSymbols
 	public putData(storeName: string, data: any, callback: InDBCallback): void {
 		const options: InDBRequestOptions = {
 			storeName: storeName,
@@ -114,6 +116,7 @@ class InDbService {
 		this.dbRequest(options, callback)
 	}
 
+	// noinspection JSUnusedGlobalSymbols
 	public clearStore(storeName: string, callback: InDBCallback): void {
 		const options: InDBRequestOptions = {
 			storeName: storeName,
@@ -308,58 +311,58 @@ class InDbService {
 		request.onerror = (event: Event): void => callback(event.target.error.message, null)
 	}
 
-	private openDBRequest_upgradeNeeded(dbScheme: InDBScheme, event: Event | null): void {
+	private openDBRequest_upgradeNeeded(scheme: InDBScheme, event: IDBVersionChangeEvent): void {
 		// @ts-ignore
 		this.db = event.target.result as IDBDatabase
 
-		// Contains the store names required by the scheme
-		const schemeStoresNames: string[] = []
-		for (const newStore of dbScheme.objectStores) {
-			schemeStoresNames.push(newStore.name)
+		// Remove the unnecessary existing object stores
+		if (this.db.objectStoreNames.length > 0) {
+			const schemeStoresNames: string[]  = scheme.objectStores.map((store: InDBObjectStore) => store.name)
+			const storeNamesToRemove: string[] = Array.from(this.db.objectStoreNames)
+				.filter((storeName: string) => schemeStoresNames.indexOf(storeName) === -1)
 
+			for (const name of storeNamesToRemove) {
+				this.db.deleteObjectStore(name)
+			}
+		}
+
+		// Add new stores
+		for (const newStore of scheme.objectStores) {
 			if (this.db.objectStoreNames.contains(newStore.name)) {
 				continue
 			}
 
 			const storeParameters: IDBObjectStoreParameters = {
 				keyPath      : newStore.keyPath,
-				autoIncrement: newStore.autoIncrement,
+				autoIncrement: !!newStore.autoIncrement,
 			}
 
 			// Create a mew object store
 			const objectStore: IDBObjectStore = this.db.createObjectStore(newStore.name, storeParameters)
 
-			// Add the necessary indexes
-			for (const index of newStore.indexes) {
-				objectStore.createIndex(index.name, index.name, {unique: index.unique})
+			// Create the necessary indexes
+			if (newStore.indexes) {
+				for (const index of newStore.indexes) {
+					objectStore.createIndex(index.name, index.name, {unique: !!index.unique})
+				}
 			}
-		}
 
-		// Collect the existing store names that are not in the new scheme.
-		const storesToRemove: string[] = []
-		for (let i = 0; i < this.db.objectStoreNames.length; i++) {
-			const storeName: string = this.db.objectStoreNames[i]
-			if (schemeStoresNames.indexOf(storeName) === -1) {
-				storesToRemove.push(storeName)
+			// Creates an index over the keyPath
+			if (!objectStore.indexNames.contains(newStore.keyPath)) {
+				objectStore.createIndex(newStore.keyPath, newStore.keyPath, {unique: true})
 			}
-		}
-
-		// Removes the unnecessary object stores.
-		for (const name of storesToRemove) {
-			this.db.deleteObjectStore(name)
 		}
 	}
 
-	private openDBRequest_success(callback: InDBCallback, event: Event | null): void {
+	private openDBRequest_success(callback: InDBCallback, event: Event): void {
 		// @ts-ignore
 		this.db = event.target.result as IDBDatabase
 
-		const storeNames: string[] = []
-		for (let i = 0; i < this.db.objectStoreNames.length; i++) {
-			storeNames.push(this.db.objectStoreNames[i])
-		}
-
-		callback(null, {name: this.db.name, version: this.db.version, storeNames: storeNames})
+		callback(null, {
+			name      : this.db.name,
+			version   : this.db.version,
+			storeNames: Array.from(this.db.objectStoreNames),
+		})
 	}
 
 	private openDBRequest_error(callback: InDBCallback, event: Event): void {

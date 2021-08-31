@@ -2,13 +2,13 @@
 class InDbService {
     constructor() {
     }
-    openDB(dbScheme, callback) {
+    openDB(scheme, callback) {
         if (typeof window.indexedDB !== 'object') {
             callback('Indexed DB is not supported!', null);
             return;
         }
-        const request = window.indexedDB.open(dbScheme.name, dbScheme.version);
-        request.onupgradeneeded = this.openDBRequest_upgradeNeeded.bind(this, dbScheme);
+        const request = window.indexedDB.open(scheme.name, scheme.version || 1);
+        request.onupgradeneeded = this.openDBRequest_upgradeNeeded.bind(this, scheme);
         request.onsuccess = this.openDBRequest_success.bind(this, callback);
         request.onerror = this.openDBRequest_error.bind(this, callback);
     }
@@ -200,41 +200,42 @@ class InDbService {
         };
         request.onerror = (event) => callback(event.target.error.message, null);
     }
-    openDBRequest_upgradeNeeded(dbScheme, event) {
+    openDBRequest_upgradeNeeded(scheme, event) {
         this.db = event.target.result;
-        const schemeStoresNames = [];
-        for (const newStore of dbScheme.objectStores) {
-            schemeStoresNames.push(newStore.name);
+        if (this.db.objectStoreNames.length > 0) {
+            const schemeStoresNames = scheme.objectStores.map((store) => store.name);
+            const storeNamesToRemove = Array.from(this.db.objectStoreNames)
+                .filter((storeName) => schemeStoresNames.indexOf(storeName) === -1);
+            for (const name of storeNamesToRemove) {
+                this.db.deleteObjectStore(name);
+            }
+        }
+        for (const newStore of scheme.objectStores) {
             if (this.db.objectStoreNames.contains(newStore.name)) {
                 continue;
             }
             const storeParameters = {
                 keyPath: newStore.keyPath,
-                autoIncrement: newStore.autoIncrement,
+                autoIncrement: !!newStore.autoIncrement,
             };
             const objectStore = this.db.createObjectStore(newStore.name, storeParameters);
-            for (const index of newStore.indexes) {
-                objectStore.createIndex(index.name, index.name, { unique: index.unique });
+            if (newStore.indexes) {
+                for (const index of newStore.indexes) {
+                    objectStore.createIndex(index.name, index.name, { unique: !!index.unique });
+                }
             }
-        }
-        const storesToRemove = [];
-        for (let i = 0; i < this.db.objectStoreNames.length; i++) {
-            const storeName = this.db.objectStoreNames[i];
-            if (schemeStoresNames.indexOf(storeName) === -1) {
-                storesToRemove.push(storeName);
+            if (!objectStore.indexNames.contains(newStore.keyPath)) {
+                objectStore.createIndex(newStore.keyPath, newStore.keyPath, { unique: true });
             }
-        }
-        for (const name of storesToRemove) {
-            this.db.deleteObjectStore(name);
         }
     }
     openDBRequest_success(callback, event) {
         this.db = event.target.result;
-        const storeNames = [];
-        for (let i = 0; i < this.db.objectStoreNames.length; i++) {
-            storeNames.push(this.db.objectStoreNames[i]);
-        }
-        callback(null, { name: this.db.name, version: this.db.version, storeNames: storeNames });
+        callback(null, {
+            name: this.db.name,
+            version: this.db.version,
+            storeNames: Array.from(this.db.objectStoreNames),
+        });
     }
     openDBRequest_error(callback, event) {
         callback(event.target.error.message, null);

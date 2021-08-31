@@ -5,18 +5,10 @@ let inDbService
 
 const dbScheme = {
 	name        : 'dbName',
-	version     : 1,
 	objectStores: [{
-		name         : 'storeName',
-		keyPath      : 'dataId',
-		autoIncrement: false,
-		indexes      : [{
-			name  : 'dataId',
-			unique: true,
-		}, {
-			name  : 'updatedAt',
-			unique: false,
-		}],
+		name    : 'storeName',
+		keyPath : 'dataId',
+		indexes : [{name: 'updatedAt'}],
 	}],
 }
 
