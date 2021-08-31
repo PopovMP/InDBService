@@ -170,6 +170,10 @@ class InDbService {
         request.onsuccess = (event) => callback(null, event.target.result);
     }
     dbCursor(objectStore, range, callback) {
+        if (!objectStore.indexNames.contains(range.index)) {
+            callback(`Index '${range.index}' doesn't exist. It must be set in the DB scheme.`, null);
+            return;
+        }
         const query = typeof range.only !== 'undefined'
             ? IDBKeyRange.only(range.only)
             : typeof range.lower === 'undefined'
