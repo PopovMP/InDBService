@@ -1,3 +1,5 @@
+// noinspection JSUnusedGlobalSymbols
+
 type InDBCallback = (err: string | null, data?: any | null) => void
 
 type InDBIndex = {
@@ -50,7 +52,6 @@ class InDbService {
 	constructor() {
 	}
 
-	// noinspection JSUnusedGlobalSymbols
 	public openDB(scheme: InDBScheme, callback: InDBCallback): void {
 		if (typeof window.indexedDB !== 'object') {
 			callback('Indexed DB is not supported!', null)
@@ -79,7 +80,6 @@ class InDbService {
 		this.dbRequest(options, callback)
 	}
 
-	// noinspection JSUnusedGlobalSymbols
 	public putData(storeName: string, data: any, callback: InDBCallback): void {
 		const options: InDBRequestOptions = {
 			storeName: storeName,

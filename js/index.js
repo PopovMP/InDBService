@@ -1,22 +1,30 @@
 'use strict'
 
-let output
-let inDbService
+const inDbService = new InDbService()
 
-const dbScheme = {
-	name        : 'dbName',
+const scheme = {
+	name        : 'dbName',      // DB name. Usually your domain or project name.
 	objectStores: [{
-		name    : 'storeName',
-		keyPath : 'dataId',
-		indexes : [{name: 'updatedAt'}],
+		name    : 'storeName',   // Object store name (aka Table name)
+		keyPath : 'dataId',      // Primary key for identifying the objects
+		indexes : [
+			{name: 'dataId'   }, // Needed for `getAllPrimaryKeys` example
+			{name: 'updatedAt'}, // Needed for `removeOldData` and `getRecentDataKeys` examples
+		],
 	}],
 }
+
+let output
 
 function runTests() {
 	output = document.getElementById('output')
 
-	inDbService = new InDbService()
-	inDbService.openDB(dbScheme,
+	openDB()
+}
+
+function openDB() {
+	// Open an existing DB, create a new one or update the current DB according to the scheme.
+	inDbService.openDB(scheme,
 		inDbService_openDB_ready)
 }
 
