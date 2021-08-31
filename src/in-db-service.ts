@@ -59,9 +59,28 @@ class InDbService {
 		}
 
 		const request: IDBOpenDBRequest = window.indexedDB.open(scheme.name, scheme.version || 1)
-		request.onupgradeneeded = this.openDBRequest_upgradeNeeded.bind(this, scheme)
-		request.onsuccess       = this.openDBRequest_success.bind(this, callback)
-		request.onerror         = this.openDBRequest_error.bind(this, callback)
+
+		request.onsuccess = (event: Event): void => {
+			this.db = (event.target as IDBRequest).result as IDBDatabase
+
+			callback(null, this.db.name)
+		}
+
+		request.onerror = (event: Event): void => {
+			callback((event.target as IDBRequest).error?.message || 'Something went wrong!', null)
+		}
+
+		request.onupgradeneeded = (event: IDBVersionChangeEvent): void => {
+			this.db = (event.target as IDBRequest).result as IDBDatabase
+
+			this.upgradeDatabase(this.db, scheme)
+		}
+	}
+
+	public closeDB(): void {
+		if (this.db) {
+			this.db.close()
+		}
 	}
 
 	public estimateUsage(callback: (estimate: StorageEstimate) => void): void {
@@ -228,50 +247,47 @@ class InDbService {
 		}
 
 		const transaction: IDBTransaction = this.db.transaction(options.storeName, options.mode)
-		transaction.onerror = function (event: Event): void {
-			// @ts-ignore
-			callback(event.target.error.message, null)
-		}
-
-		const objectStore: IDBObjectStore = transaction.objectStore(options.storeName)
+		const store: IDBObjectStore       = transaction.objectStore(options.storeName)
 
 		let request: IDBRequest
 		switch (options.actionTag) {
 			case 'add':
-				request = objectStore.add(options.data)
+				request = store.add(options.data)
 				break
 			case 'clear':
-				request = objectStore.clear()
+				request = store.clear()
 				break
 			case 'count':
-				request = objectStore.count()
+				request = store.count()
 				break
 			case 'delete':
-				request = objectStore.delete(options.keyPath)
+				request = store.delete(options.keyPath)
 				break
 			case 'get':
-				request = objectStore.get(options.keyPath)
+				request = store.get(options.keyPath)
+				break
+			case 'put':
+				request = store.put(options.data)
 				break
 			case 'getKeys':
-				this.dbCursor(objectStore, options.data, callback)
+				this.dbCursor(store, options.data, callback)
 				return
-			case 'put':
-				request = objectStore.put(options.data)
-				break
 			default:
 				callback('Unknown operation', null)
 				return
 		}
 
-		// @ts-ignore
-		request.onerror = (event: Event): void => callback(event.target.error.message, null)
+		request.onsuccess = (event: Event): void => {
+			callback(null, (event.target as IDBRequest).result)
+		}
 
-		// @ts-ignore
-		request.onsuccess = (event: Event): void => callback(null, event.target.result)
+		request.onerror = (event: Event): void => {
+			callback((event.target as IDBRequest).error?.message || 'Something went wrong!', null)
+		}
 	}
 
-	private dbCursor(objectStore: IDBObjectStore, range: InDBKeysRange, callback: InDBCallback): void {
-		if (!objectStore.indexNames.contains(range.index)) {
+	private dbCursor(store: IDBObjectStore, range: InDBKeysRange, callback: InDBCallback): void {
+		if (!store.indexNames.contains(range.index)) {
 			callback(`Index '${range.index}' doesn't exist. It must be set in the DB scheme.`, null)
 			return
 		}
@@ -284,56 +300,53 @@ class InDbService {
 					? IDBKeyRange.lowerBound(range.lower, range.lowerOpen)
 					: IDBKeyRange.bound(range.lower, range.upper, range.lowerOpen, range.upperOpen)
 
-		const index: IDBIndex     = objectStore.index(range.index)
+		const index: IDBIndex     = store.index(range.index)
 		const request: IDBRequest = index.openKeyCursor(query)
 		const keys: any[]         = []
 		const maxLength: number   = range.count || 1000000
 
 		request.onsuccess = (event: Event): void => {
-			// @ts-ignore
-			const cursor: IDBCursor = event.target.result
+			const cursor: IDBCursor = (event.target as IDBRequest).result
 
 			if (!cursor || (!range.fromTop && keys.length >= maxLength)) {
 				const data: any[] = range.fromTop
 					? keys.slice(Math.max(keys.length - maxLength, 0))
 					: keys
+
 				callback(null, data)
 				return
 			}
 
 			const cursorData: any = {}
-			cursorData[objectStore.keyPath as string] = cursor.primaryKey
-			if (range.index !== objectStore.keyPath) {
+			cursorData[store.keyPath as string] = cursor.primaryKey
+			if (range.index !== store.keyPath) {
 				cursorData[range.index] = cursor.key
 			}
 
 			keys.push(cursorData)
-
 			cursor.continue()
 		}
 
-		// @ts-ignore
-		request.onerror = (event: Event): void => callback(event.target.error.message, null)
+		request.onerror = (event: Event): void => {
+			callback((event.target as IDBRequest)?.error?.message || 'Something went wrong!', null)
+		}
 	}
 
-	private openDBRequest_upgradeNeeded(scheme: InDBScheme, event: IDBVersionChangeEvent): void {
-		// @ts-ignore
-		this.db = event.target.result as IDBDatabase
-
+	private upgradeDatabase(db: IDBDatabase, scheme: InDBScheme): void {
 		// Remove the unnecessary existing object stores
-		if (this.db.objectStoreNames.length > 0) {
+		if (db.objectStoreNames.length > 0) {
 			const schemeStoresNames: string[]  = scheme.objectStores.map((store: InDBObjectStore) => store.name)
-			const storeNamesToRemove: string[] = Array.from(this.db.objectStoreNames)
+			const storeNamesToRemove: string[] = Array.from(db.objectStoreNames)
 				.filter((storeName: string) => schemeStoresNames.indexOf(storeName) === -1)
 
 			for (const name of storeNamesToRemove) {
-				this.db.deleteObjectStore(name)
+				db.deleteObjectStore(name)
 			}
 		}
 
 		// Add new stores
 		for (const newStore of scheme.objectStores) {
-			if (this.db.objectStoreNames.contains(newStore.name)) {
+			if (db.objectStoreNames.contains(newStore.name)) {
 				continue
 			}
 
@@ -343,7 +356,7 @@ class InDbService {
 			}
 
 			// Create a mew object store
-			const objectStore: IDBObjectStore = this.db.createObjectStore(newStore.name, storeParameters)
+			const objectStore: IDBObjectStore = db.createObjectStore(newStore.name, storeParameters)
 
 			// Create the necessary indexes
 			if (newStore.indexes) {
@@ -352,21 +365,5 @@ class InDbService {
 				}
 			}
 		}
-	}
-
-	private openDBRequest_success(callback: InDBCallback, event: Event): void {
-		// @ts-ignore
-		this.db = event.target.result as IDBDatabase
-
-		callback(null, {
-			name      : this.db.name,
-			version   : this.db.version,
-			storeNames: Array.from(this.db.objectStoreNames),
-		})
-	}
-
-	private openDBRequest_error(callback: InDBCallback, event: Event): void {
-		// @ts-ignore
-		callback(event.target.error.message, null)
 	}
 }

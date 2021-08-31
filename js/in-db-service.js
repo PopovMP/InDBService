@@ -8,9 +8,23 @@ class InDbService {
             return;
         }
         const request = window.indexedDB.open(scheme.name, scheme.version || 1);
-        request.onupgradeneeded = this.openDBRequest_upgradeNeeded.bind(this, scheme);
-        request.onsuccess = this.openDBRequest_success.bind(this, callback);
-        request.onerror = this.openDBRequest_error.bind(this, callback);
+        request.onsuccess = (event) => {
+            this.db = event.target.result;
+            callback(null, this.db.name);
+        };
+        request.onerror = (event) => {
+            var _a;
+            callback(((_a = event.target.error) === null || _a === void 0 ? void 0 : _a.message) || 'Something went wrong!', null);
+        };
+        request.onupgradeneeded = (event) => {
+            this.db = event.target.result;
+            this.upgradeDatabase(this.db, scheme);
+        };
+    }
+    closeDB() {
+        if (this.db) {
+            this.db.close();
+        }
     }
     estimateUsage(callback) {
         navigator.storage.estimate().then(callback);
@@ -135,42 +149,44 @@ class InDbService {
             return;
         }
         const transaction = this.db.transaction(options.storeName, options.mode);
-        transaction.onerror = function (event) {
-            callback(event.target.error.message, null);
-        };
-        const objectStore = transaction.objectStore(options.storeName);
+        const store = transaction.objectStore(options.storeName);
         let request;
         switch (options.actionTag) {
             case 'add':
-                request = objectStore.add(options.data);
+                request = store.add(options.data);
                 break;
             case 'clear':
-                request = objectStore.clear();
+                request = store.clear();
                 break;
             case 'count':
-                request = objectStore.count();
+                request = store.count();
                 break;
             case 'delete':
-                request = objectStore.delete(options.keyPath);
+                request = store.delete(options.keyPath);
                 break;
             case 'get':
-                request = objectStore.get(options.keyPath);
+                request = store.get(options.keyPath);
+                break;
+            case 'put':
+                request = store.put(options.data);
                 break;
             case 'getKeys':
-                this.dbCursor(objectStore, options.data, callback);
+                this.dbCursor(store, options.data, callback);
                 return;
-            case 'put':
-                request = objectStore.put(options.data);
-                break;
             default:
                 callback('Unknown operation', null);
                 return;
         }
-        request.onerror = (event) => callback(event.target.error.message, null);
-        request.onsuccess = (event) => callback(null, event.target.result);
+        request.onsuccess = (event) => {
+            callback(null, event.target.result);
+        };
+        request.onerror = (event) => {
+            var _a;
+            callback(((_a = event.target.error) === null || _a === void 0 ? void 0 : _a.message) || 'Something went wrong!', null);
+        };
     }
-    dbCursor(objectStore, range, callback) {
-        if (!objectStore.indexNames.contains(range.index)) {
+    dbCursor(store, range, callback) {
+        if (!store.indexNames.contains(range.index)) {
             callback(`Index '${range.index}' doesn't exist. It must be set in the DB scheme.`, null);
             return;
         }
@@ -181,7 +197,7 @@ class InDbService {
                 : typeof range.upper === 'undefined'
                     ? IDBKeyRange.lowerBound(range.lower, range.lowerOpen)
                     : IDBKeyRange.bound(range.lower, range.upper, range.lowerOpen, range.upperOpen);
-        const index = objectStore.index(range.index);
+        const index = store.index(range.index);
         const request = index.openKeyCursor(query);
         const keys = [];
         const maxLength = range.count || 1000000;
@@ -195,50 +211,41 @@ class InDbService {
                 return;
             }
             const cursorData = {};
-            cursorData[objectStore.keyPath] = cursor.primaryKey;
-            if (range.index !== objectStore.keyPath) {
+            cursorData[store.keyPath] = cursor.primaryKey;
+            if (range.index !== store.keyPath) {
                 cursorData[range.index] = cursor.key;
             }
             keys.push(cursorData);
             cursor.continue();
         };
-        request.onerror = (event) => callback(event.target.error.message, null);
+        request.onerror = (event) => {
+            var _a, _b;
+            callback(((_b = (_a = event.target) === null || _a === void 0 ? void 0 : _a.error) === null || _b === void 0 ? void 0 : _b.message) || 'Something went wrong!', null);
+        };
     }
-    openDBRequest_upgradeNeeded(scheme, event) {
-        this.db = event.target.result;
-        if (this.db.objectStoreNames.length > 0) {
+    upgradeDatabase(db, scheme) {
+        if (db.objectStoreNames.length > 0) {
             const schemeStoresNames = scheme.objectStores.map((store) => store.name);
-            const storeNamesToRemove = Array.from(this.db.objectStoreNames)
+            const storeNamesToRemove = Array.from(db.objectStoreNames)
                 .filter((storeName) => schemeStoresNames.indexOf(storeName) === -1);
             for (const name of storeNamesToRemove) {
-                this.db.deleteObjectStore(name);
+                db.deleteObjectStore(name);
             }
         }
         for (const newStore of scheme.objectStores) {
-            if (this.db.objectStoreNames.contains(newStore.name)) {
+            if (db.objectStoreNames.contains(newStore.name)) {
                 continue;
             }
             const storeParameters = {
                 keyPath: newStore.keyPath,
                 autoIncrement: !!newStore.autoIncrement,
             };
-            const objectStore = this.db.createObjectStore(newStore.name, storeParameters);
+            const objectStore = db.createObjectStore(newStore.name, storeParameters);
             if (newStore.indexes) {
                 for (const index of newStore.indexes) {
                     objectStore.createIndex(index.name, index.name, { unique: !!index.unique });
                 }
             }
         }
-    }
-    openDBRequest_success(callback, event) {
-        this.db = event.target.result;
-        callback(null, {
-            name: this.db.name,
-            version: this.db.version,
-            storeNames: Array.from(this.db.objectStoreNames),
-        });
-    }
-    openDBRequest_error(callback, event) {
-        callback(event.target.error.message, null);
     }
 }

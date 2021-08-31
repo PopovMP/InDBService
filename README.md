@@ -171,3 +171,12 @@ const removeOptions = {
 
 inDbService.removeOldData(removeOptions, (err, data) => {})
 ```
+
+### Close IndexedDB
+
+The `closeDB` method returns immediately. However, it only schedules DB close.
+The actual DB close will happen when all current transactions are completed.
+
+```js
+    inDbService.closeDB()
+```

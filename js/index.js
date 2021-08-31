@@ -25,16 +25,20 @@ function runTests() {
 function openDB() {
 	// Open an existing DB, create a new one or update the current DB according to the scheme.
 	inDbService.openDB(scheme,
-		inDbService_openDB_ready)
+		openDB_ready)
 }
 
-function inDbService_openDB_ready(err, data) {
+/**
+ * @param {string|null} err
+ * @param {string|null} dbName
+ */
+function openDB_ready(err, dbName) {
 	if (err) {
 		appendText(err)
 		return
 	}
 
-	appendText(`DB opened: ${JSON.stringify(data)}`)
+	appendText(`DB opened: ${dbName}`)
 
 	addData()
 }
@@ -47,16 +51,20 @@ function addData() {
 	}
 
 	inDbService.addData('storeName', doc,
-		inDbService_addData_ready)
+		addData_ready)
 }
 
-function inDbService_addData_ready(err, data) {
+/**
+ * @param {string|null} err
+ * @param {string|null} keyPath
+ */
+function addData_ready(err, keyPath) {
 	if (err) {
 		appendText(err)
 		return
 	}
 
-	appendText(`Doc added: ${data}`)
+	appendText(`Doc added: ${keyPath}`)
 
 	countData()
 }
@@ -66,6 +74,10 @@ function countData() {
 		countData_ready)
 }
 
+/**
+ * @param {string|null} err
+ * @param {number|null} count
+ */
 function countData_ready(err, count) {
 	if (err) {
 		appendText(err)
@@ -91,6 +103,10 @@ function removeOldData() {
 
 }
 
+/**
+ * @param {string|null} err
+ * @param {number|null} countRemoved
+ */
 function removeOldData_ready(err, countRemoved) {
 	if (err) {
 		appendText(`Error: ${err}`)
@@ -135,10 +151,10 @@ function getData(dataId) {
 	appendText('\nGet data:')
 
 	inDbService.getData('storeName', dataId,
-		getDocument_ready)
+		getData_ready)
 }
 
-function getDocument_ready(err, data) {
+function getData_ready(err, data) {
 	if (err) {
 		appendText(err)
 		return
@@ -153,10 +169,10 @@ function getAllPrimaryKeys() {
 	appendText('\nAll primary keys:')
 
 	inDbService.getKeys('storeName', {index: 'dataId'},
-		getAllPrimaryKeys_ready)
+		getKeys_ready)
 }
 
-function getAllPrimaryKeys_ready(err, data) {
+function getKeys_ready(err, data) {
 	if (err) {
 		appendText(err)
 		return
@@ -177,6 +193,12 @@ function estimateUsage() {
 
 function estimateUsage_ready(estimate) {
 	appendText(JSON.stringify(estimate, null, 2))
+
+	closeDB()
+}
+
+function closeDB() {
+	inDbService.closeDB()
 }
 
 function appendText(text) {
