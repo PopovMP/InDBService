@@ -20,11 +20,11 @@ Open a DB by providing a scheme. **InDBService**  will create a new DB if it doe
 ```js
 // Database scheme
 const scheme = {
-	name : 'bookstore', // DB name. Usually your domain or project name.
-	objectStores: [{
-		name   : 'books', // Object store name (aka Table name)
-		keyPath: 'isbn', // Primary key for identifying the objects
-	}],
+    name : 'bookstore', // DB name. Usually your domain or project name.
+    objectStores: [{
+       name   : 'books', // Object store name (aka Table name)
+        keyPath: 'isbn', // Primary key for identifying the objects
+    }],
 }
 
 // Open (or create a DB)
@@ -34,17 +34,29 @@ inDbService.openDB(scheme, (err, dbDetails) => {})
 
 ### Add a document
 
-`addData` - adds a document to an open DB
+`addData` - adds a document to an open DB.
+
+**Note that the new document must have a unique keyPath.** 
+
+If you want to update an existing document use the `putData` method.
 
 ```js
 // Add a document
 const book = {
-	isbn: '0330508113',
-	title: 'The Ultimate Hitchhiker\'s Guide',
+    isbn  : '0330508113', // This field is mandatory because it is a `keyPath` of the `dataStore`.
+    title : 'The Ultimate Hitchhiker\'s Guide',
     author: 'Douglas Adams',
-    year: '2009',
+    year  : '2009',
 }
 inDbService.addData('books', book, (err, data) => {})
+```
+
+### Add or update a document
+
+`putData` - adds a new document or updates an existing one.
+
+```js
+inDbService.putData('books', book, (err, data) => {})
 ```
 
 ### Get a document by key
@@ -64,7 +76,6 @@ inDbService.getData('books', '0330508113', (err, data) => {})
 // Delete a document
 inDbService.deleteData('books', '0330508113', (err, data) => {})
 ```
-
 
 ### Count of documents
 
