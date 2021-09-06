@@ -1,4 +1,4 @@
-// noinspection JSUnusedGlobalSymbols
+// noinspection JSUnresolvedVariable,ES6ConvertVarToLetConst,JSUnusedGlobalSymbols
 
 type InDBCallback = (err: string | null, data?: any | null) => void
 
@@ -52,6 +52,14 @@ class InDbService {
 	constructor() {
 	}
 
+	/**
+	 * Opens an IndexedDB. Creates or upgrades it if necessary.
+	 *
+	 * @param {InDBScheme} scheme
+	 * @param {function(err: string|null, dbName: string|null): void} callback
+	 *
+	 * @return {void}
+	 */
 	public openDB(scheme: InDBScheme, callback: InDBCallback): void {
 		if (typeof window.indexedDB !== 'object') {
 			callback('Indexed DB is not supported!', null)
@@ -77,20 +85,44 @@ class InDbService {
 		}
 	}
 
+	/**
+	 * Closes the DB
+	 *
+	 * @return {void}
+	 */
 	public closeDB(): void {
 		if (this.db) {
 			this.db.close()
 		}
 	}
 
+	/**
+	 * Gets the estimate storage usage
+	 *
+	 * @param {function(usage: object)} callback
+	 *
+	 * @return {void}
+	 */
 	public estimateUsage(callback: (estimate: StorageEstimate) => void): void {
 		navigator.storage.estimate().then(callback)
 	}
 
-	public addData(storeName: string, data: any, callback: InDBCallback): void {
+	/**
+	 * Adds a document to the DB.
+	 *
+	 * The document must not exist.
+	 * Use `putData` to add or update a document.
+	 *
+	 * @param {string} storeName
+	 * @param {object} data
+	 * @param {function(err: string|null, key: string|null): void} callback
+	 *
+	 * @return {void}
+	 */
+	public addData(storeName: string, data: object, callback: InDBCallback): void {
 		const options: InDBRequestOptions = {
-			storeName: storeName,
-			data     : data,
+			storeName,
+			data,
 			keyPath  : '',
 			mode     : 'readwrite',
 			actionTag: 'add',
@@ -99,10 +131,19 @@ class InDbService {
 		this.dbRequest(options, callback)
 	}
 
-	public putData(storeName: string, data: any, callback: InDBCallback): void {
+	/**
+	 * Adds or updates a document.
+	 *
+	 * @param {string} storeName
+	 * @param {object}  data
+	 * @param {function(err: string|null, key: string|null): void} callback
+	 *
+	 * @return {void}
+	 */
+	public putData(storeName: string, data: object, callback: InDBCallback): void {
 		const options: InDBRequestOptions = {
-			storeName: storeName,
-			data     : data,
+			storeName,
+			data,
 			keyPath  : '',
 			mode     : 'readwrite',
 			actionTag: 'put',
@@ -111,9 +152,18 @@ class InDbService {
 		this.dbRequest(options, callback)
 	}
 
+	/**
+	 * Gets a document from DB.
+	 *
+	 * @param {string} storeName
+	 * @param {string}  key
+	 * @param {function(err: string|null, document: object|null): void} callback
+	 *
+	 * @return {void}
+	 */
 	public getData(storeName: string, key: string, callback: InDBCallback): void {
 		const options: InDBRequestOptions = {
-			storeName: storeName,
+			storeName,
 			data     : undefined,
 			keyPath  : key,
 			mode     : 'readonly',
@@ -123,9 +173,18 @@ class InDbService {
 		this.dbRequest(options, callback)
 	}
 
+	/**
+	 * Deletes a document from DB.
+	 *
+	 * @param {string} storeName
+	 * @param {string}  key
+	 * @param {function(err: string|null): void} callback
+	 *
+	 * @return {void}
+	 */
 	public deleteData(storeName: string, key: string, callback: InDBCallback): void {
 		const options: InDBRequestOptions = {
-			storeName: storeName,
+			storeName,
 			data     : undefined,
 			keyPath  : key,
 			mode     : 'readwrite',
@@ -135,10 +194,17 @@ class InDbService {
 		this.dbRequest(options, callback)
 	}
 
-	// noinspection JSUnusedGlobalSymbols
+	/**
+	 * Removes all documents from a store.
+	 *
+	 * @param {string} storeName
+	 * @param {function(err: string|null): void} callback
+	 *
+	 * @return {void}
+	 */
 	public clearStore(storeName: string, callback: InDBCallback): void {
 		const options: InDBRequestOptions = {
-			storeName: storeName,
+			storeName,
 			data     : undefined,
 			keyPath  : '',
 			mode     : 'readwrite',
@@ -148,9 +214,17 @@ class InDbService {
 		this.dbRequest(options, callback)
 	}
 
+	/**
+	 * Gets the count of documents ina store.
+	 *
+	 * @param {string} storeName
+	 * @param {function(err: string|null, count: number|null): void} callback
+	 *
+	 * @return {void}
+	 */
 	public countData(storeName: string, callback: InDBCallback): void {
 		const options: InDBRequestOptions = {
-			storeName: storeName,
+			storeName,
 			data     : undefined,
 			keyPath  : '',
 			mode     : 'readonly',
@@ -162,7 +236,7 @@ class InDbService {
 
 	public getKeys(storeName: string, keysRange: InDBKeysRange, callback: InDBCallback): void {
 		const options: InDBRequestOptions = {
-			storeName: storeName,
+			storeName,
 			data     : keysRange,
 			keyPath  : '',
 			mode     : 'readonly',

@@ -1,7 +1,15 @@
-"use strict";
+// noinspection JSUnresolvedVariable,ES6ConvertVarToLetConst,JSUnusedGlobalSymbols
 class InDbService {
     constructor() {
     }
+    /**
+     * Opens an IndexedDB. Creates or upgrades it if necessary.
+     *
+     * @param {InDBScheme} scheme
+     * @param {function(err: string|null, dbName: string|null): void} callback
+     *
+     * @return {void}
+     */
     openDB(scheme, callback) {
         if (typeof window.indexedDB !== 'object') {
             callback('Indexed DB is not supported!', null);
@@ -21,37 +29,79 @@ class InDbService {
             InDbService.upgradeDatabase(this.db, scheme);
         };
     }
+    /**
+     * Closes the DB
+     *
+     * @return {void}
+     */
     closeDB() {
         if (this.db) {
             this.db.close();
         }
     }
+    /**
+     * Gets the estimate storage usage
+     *
+     * @param {function(usage: object)} callback
+     *
+     * @return {void}
+     */
     estimateUsage(callback) {
         navigator.storage.estimate().then(callback);
     }
+    /**
+     * Adds a document to the DB.
+     *
+     * The document must not exist.
+     * Use `putData` to add or update a document.
+     *
+     * @param {string} storeName
+     * @param {object} data
+     * @param {function(err: string|null, key: string|null): void} callback
+     *
+     * @return {void}
+     */
     addData(storeName, data, callback) {
         const options = {
-            storeName: storeName,
-            data: data,
+            storeName,
+            data,
             keyPath: '',
             mode: 'readwrite',
             actionTag: 'add',
         };
         this.dbRequest(options, callback);
     }
+    /**
+     * Adds or updates a document.
+     *
+     * @param {string} storeName
+     * @param {object}  data
+     * @param {function(err: string|null, key: string|null): void} callback
+     *
+     * @return {void}
+     */
     putData(storeName, data, callback) {
         const options = {
-            storeName: storeName,
-            data: data,
+            storeName,
+            data,
             keyPath: '',
             mode: 'readwrite',
             actionTag: 'put',
         };
         this.dbRequest(options, callback);
     }
+    /**
+     * Gets a document from DB.
+     *
+     * @param {string} storeName
+     * @param {string}  key
+     * @param {function(err: string|null, document: object|null): void} callback
+     *
+     * @return {void}
+     */
     getData(storeName, key, callback) {
         const options = {
-            storeName: storeName,
+            storeName,
             data: undefined,
             keyPath: key,
             mode: 'readonly',
@@ -59,9 +109,18 @@ class InDbService {
         };
         this.dbRequest(options, callback);
     }
+    /**
+     * Deletes a document from DB.
+     *
+     * @param {string} storeName
+     * @param {string}  key
+     * @param {function(err: string|null): void} callback
+     *
+     * @return {void}
+     */
     deleteData(storeName, key, callback) {
         const options = {
-            storeName: storeName,
+            storeName,
             data: undefined,
             keyPath: key,
             mode: 'readwrite',
@@ -69,9 +128,17 @@ class InDbService {
         };
         this.dbRequest(options, callback);
     }
+    /**
+     * Removes all documents from a store.
+     *
+     * @param {string} storeName
+     * @param {function(err: string|null): void} callback
+     *
+     * @return {void}
+     */
     clearStore(storeName, callback) {
         const options = {
-            storeName: storeName,
+            storeName,
             data: undefined,
             keyPath: '',
             mode: 'readwrite',
@@ -79,9 +146,17 @@ class InDbService {
         };
         this.dbRequest(options, callback);
     }
+    /**
+     * Gets the count of documents ina store.
+     *
+     * @param {string} storeName
+     * @param {function(err: string|null, count: number|null): void} callback
+     *
+     * @return {void}
+     */
     countData(storeName, callback) {
         const options = {
-            storeName: storeName,
+            storeName,
             data: undefined,
             keyPath: '',
             mode: 'readonly',
@@ -91,7 +166,7 @@ class InDbService {
     }
     getKeys(storeName, keysRange, callback) {
         const options = {
-            storeName: storeName,
+            storeName,
             data: keysRange,
             keyPath: '',
             mode: 'readonly',
@@ -99,14 +174,20 @@ class InDbService {
         };
         this.dbRequest(options, callback);
     }
+    /**
+     * Prunes DB by removing the oldest data.
+     * It leaves the required newest count of data.
+     */
     removeOldData(options, callback) {
         const self = this;
+        // Count all data
         this.countData(options.storeName, count_ready);
         function count_ready(err, count) {
             if (err) {
                 callback(err, 0);
                 return;
             }
+            // Check if there are objects to remove
             if (count <= options.countToLeave) {
                 callback(null, 0);
                 return;
@@ -115,6 +196,7 @@ class InDbService {
                 index: options.index,
                 count: count - options.countToLeave
             };
+            // Get the IDs of the data to be removed
             self.getKeys(options.storeName, keysRange, getKeys_ready);
         }
         function getKeys_ready(err, data) {
@@ -129,6 +211,7 @@ class InDbService {
                 callback(null, countRemoved);
                 return;
             }
+            // Deletes an document from `storeName` with a specified ID
             self.deleteData(options.storeName, ids[0], deleteData_ready);
             function deleteData_ready(err) {
                 if (err) {
@@ -224,6 +307,7 @@ class InDbService {
         };
     }
     static upgradeDatabase(db, scheme) {
+        // Remove the unnecessary existing object stores
         if (db.objectStoreNames.length > 0) {
             const schemeStoresNames = scheme.objectStores.map((store) => store.name);
             const storeNamesToRemove = Array.from(db.objectStoreNames)
@@ -232,6 +316,7 @@ class InDbService {
                 db.deleteObjectStore(name);
             }
         }
+        // Add new stores
         for (const newStore of scheme.objectStores) {
             if (db.objectStoreNames.contains(newStore.name)) {
                 continue;
@@ -240,7 +325,9 @@ class InDbService {
                 keyPath: newStore.keyPath,
                 autoIncrement: !!newStore.autoIncrement,
             };
+            // Create a mew object store
             const objectStore = db.createObjectStore(newStore.name, storeParameters);
+            // Create the necessary indexes
             if (newStore.indexes) {
                 for (const index of newStore.indexes) {
                     objectStore.createIndex(index.name, index.name, { unique: !!index.unique });
