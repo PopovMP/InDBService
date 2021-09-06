@@ -73,7 +73,7 @@ class InDbService {
 		request.onupgradeneeded = (event: IDBVersionChangeEvent): void => {
 			this.db = (event.target as IDBRequest).result as IDBDatabase
 
-			this.upgradeDatabase(this.db, scheme)
+			InDbService.upgradeDatabase(this.db, scheme)
 		}
 	}
 
@@ -270,7 +270,7 @@ class InDbService {
 				request = store.put(options.data)
 				break
 			case 'getKeys':
-				this.dbCursor(store, options.data, callback)
+				InDbService.dbCursor(store, options.data, callback)
 				return
 			default:
 				callback('Unknown operation', null)
@@ -286,7 +286,7 @@ class InDbService {
 		}
 	}
 
-	private dbCursor(store: IDBObjectStore, range: InDBKeysRange, callback: InDBCallback): void {
+	private static dbCursor(store: IDBObjectStore, range: InDBKeysRange, callback: InDBCallback): void {
 		if (!store.indexNames.contains(range.index)) {
 			callback(`Index '${range.index}' doesn't exist. It must be set in the DB scheme.`, null)
 			return
@@ -332,7 +332,7 @@ class InDbService {
 		}
 	}
 
-	private upgradeDatabase(db: IDBDatabase, scheme: InDBScheme): void {
+	private static upgradeDatabase(db: IDBDatabase, scheme: InDBScheme): void {
 		// Remove the unnecessary existing object stores
 		if (db.objectStoreNames.length > 0) {
 			const schemeStoresNames: string[]  = scheme.objectStores.map((store: InDBObjectStore) => store.name)

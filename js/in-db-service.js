@@ -18,7 +18,7 @@ class InDbService {
         };
         request.onupgradeneeded = (event) => {
             this.db = event.target.result;
-            this.upgradeDatabase(this.db, scheme);
+            InDbService.upgradeDatabase(this.db, scheme);
         };
     }
     closeDB() {
@@ -171,7 +171,7 @@ class InDbService {
                 request = store.put(options.data);
                 break;
             case 'getKeys':
-                this.dbCursor(store, options.data, callback);
+                InDbService.dbCursor(store, options.data, callback);
                 return;
             default:
                 callback('Unknown operation', null);
@@ -185,7 +185,7 @@ class InDbService {
             callback(((_a = event.target.error) === null || _a === void 0 ? void 0 : _a.message) || 'Something went wrong!', null);
         };
     }
-    dbCursor(store, range, callback) {
+    static dbCursor(store, range, callback) {
         if (!store.indexNames.contains(range.index)) {
             callback(`Index '${range.index}' doesn't exist. It must be set in the DB scheme.`, null);
             return;
@@ -223,7 +223,7 @@ class InDbService {
             callback(((_b = (_a = event.target) === null || _a === void 0 ? void 0 : _a.error) === null || _b === void 0 ? void 0 : _b.message) || 'Something went wrong!', null);
         };
     }
-    upgradeDatabase(db, scheme) {
+    static upgradeDatabase(db, scheme) {
         if (db.objectStoreNames.length > 0) {
             const schemeStoresNames = scheme.objectStores.map((store) => store.name);
             const storeNamesToRemove = Array.from(db.objectStoreNames)
