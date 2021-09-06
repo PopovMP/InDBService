@@ -279,13 +279,13 @@ class InDbService {
 				getKeys_ready)
 		}
 
-		function getKeys_ready(err: string | null, data: any[]) {
+		function getKeys_ready(err: string | null, data: object[]) {
 			if (err) {
 				callback(err, 0)
 				return
 			}
 
-			loop(data.map((e: any) => e[options.keyPath]))
+			loop(data.map((e: object) => e[options.keyPath]))
 		}
 
 		function loop(ids: string[], countRemoved: number = 0) {
@@ -376,14 +376,14 @@ class InDbService {
 
 		const index: IDBIndex     = store.index(range.index)
 		const request: IDBRequest = index.openKeyCursor(query)
-		const keys: any[]         = []
+		const keys: object[]         = []
 		const maxLength: number   = range.count || 1000000
 
 		request.onsuccess = (event: Event): void => {
 			const cursor: IDBCursor = (event.target as IDBRequest).result
 
 			if (!cursor || (!range.fromTop && keys.length >= maxLength)) {
-				const data: any[] = range.fromTop
+				const data: object[] = range.fromTop
 					? keys.slice(Math.max(keys.length - maxLength, 0))
 					: keys
 
@@ -391,7 +391,7 @@ class InDbService {
 				return
 			}
 
-			const cursorData: any = {}
+			const cursorData: object = {}
 			cursorData[store.keyPath as string] = cursor.primaryKey
 			if (range.index !== store.keyPath) {
 				cursorData[range.index] = cursor.key
